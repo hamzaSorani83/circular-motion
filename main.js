@@ -1,84 +1,185 @@
-const canvas = document.querySelector('canvas');
-const c = canvas.getContext('2d');
+/**
+ * With love.
+ * http://hakim.se/experiments/
+ * http://twitter.com/hakimel
+ */
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+var SCREEN_WIDTH = innerWidth;
+var SCREEN_HEIGHT = innerHeight;
 
-const mouse = {
-    x: innerWidth / 2,
-    y: innerHeight / 2,
-}
+var RADIUS = 110;
 
-// Event Listeners
-addEventListener('mousemove', (event) => {
-    mouse.x = event.clientX;
-    mouse.y = event.clientY;
-})
+var RADIUS_SCALE = 1;
+var RADIUS_SCALE_MIN = 1;
+var RADIUS_SCALE_MAX = 1.5;
 
-addEventListener('resize', () => {
-    canvas.width = innerWidth;
-    canvas.height = innerHeight;
-    init();
-})
+// The number of particles that are used to generate the trail
+var QUANTITY = 25;
 
-function randomIntFromRange(min, max) {
-    return Math.floor(Math.random() * (max - min + 1) + min)
-}
+var canvas;
+var context;
+var particles;
 
-// Objects
-class Particle {
-    constructor(x, y, radius, color) {
-        this.x = x;
-        this.y = y;
-        this.radius = radius;
-        this.color = color;
-        this.radians = Math.random() * Math.PI * 2;
-        this.velocity = 0.05;
-        this.distance = randomIntFromRange(50, 120);
-        this.lastMouse = { x: x, y: y };
-    }
-    update() {
-        const lastPoint = { x: this.x, y: this.y };
-        this.radians += this.velocity;
-        this.lastMouse.x += (mouse.x - this.lastMouse.x) * 0.05;
-        this.lastMouse.y += (mouse.y - this.lastMouse.y) * 0.05;
-        this.x = this.lastMouse.x + Math.cos(this.radians) * this.distance;
-        this.y = this.lastMouse.y + Math.sin(this.radians) * this.distance;
-        this.draw(lastPoint);
-    }
-    draw(lastPoint) {
-        c.beginPath();
-        c.strokeStyle = this.color;
-        c.lineWidth = this.radius;
-        c.moveTo(lastPoint.x, lastPoint.y);
-        c.lineTo(this.x, this.y);
-        c.stroke();
-        c.closePath();
-    }
-}
+var mouseX = (window.innerWidth / 2);
+console.log(mouseX)
+var mouseY = (window.innerHeight / 2);
+var mouseIsDown = false;
 
-// Implementation
-let particles;
+window.addEventListener('load', init)
 
 function init() {
-    particles = [];
-    for (let i = 0; i < 50; i++) {
-        const radius = (Math.random() * 2) + 1;
-        const color = '#' + (Math.random() * 0x404040 + 0xaaaaaa | 0).toString(16);
-        particles.push(new Particle(mouse.x, mouse.y, radius, color))
+
+    // c.clearRect();
+    canvas = document.getElementById('world');
+
+    if (canvas && canvas.getContext) {
+        context = canvas.getContext('2d');
+
+        // Register event listeners
+        document.addEventListener('mousemove', documentMouseMoveHandler, false);
+        document.addEventListener('mousedown', documentMouseDownHandler, false);
+        document.addEventListener('mouseup', documentMouseUpHandler, false);
+        canvas.addEventListener('touchstart', canvasTouchStartHandler, false);
+        canvas.addEventListener('touchmove', canvasTouchMoveHandler, false);
+        window.addEventListener('resize', windowResizeHandler, false);
+
+        createParticles();
+
+        windowResizeHandler();
+
+        setInterval(loop, 1000 / 60)
     }
-    console.log(particles);
 }
 
-// Animation Loop
-function animate() {
-    requestAnimationFrame(animate);
-    c.fillStyle = 'rgba(0,0,0,0.05)';
-    c.fillRect(0, 0, canvas.width, canvas.height);
-    particles.forEach(particle => {
-        particle.update();
-    })
+function createParticles() {
+    particles = [];
+    // particles.push(new Particle(innerWidth /2,innerHeight / 2, 5, colors[i]))
+    for (var i = 0; i < QUANTITY; i++) {
+        var particle = {
+            position: { x: mouseX, y: mouseY },
+            shift: { x: mouseX, y: mouseY },
+            size: 1,
+            angle: 0,
+            speed: 0.01 + Math.random() * 0.04,
+            targetSize: 1,
+            fillColor: '#' + (Math.random() * 0x404040 + 0xaaaaaa | 0).toString(16),
+            orbit: RADIUS * .5 + (RADIUS * .5 * Math.random())
+        };
+
+        particles.push(particle);
+    }
 }
 
-init();
-animate();
+function documentMouseMoveHandler(event) {
+    mouseX = event.clientX - (window.innerWidth - SCREEN_WIDTH) * .5;
+    mouseY = event.clientY - (window.innerHeight - SCREEN_HEIGHT) * .5;
+}
+
+function documentMouseDownHandler(event) {
+    mouseIsDown = true;
+}
+
+function documentMouseUpHandler(event) {
+    mouseIsDown = false;
+}
+
+function canvasTouchStartHandler(event) {
+    if (event.touches.length == 1) {
+        event.preventDefault();
+
+        mouseX = event.touches[0].pageX - (window.innerWidth - SCREEN_WIDTH) * .5;
+        mouseY = event.touches[0].pageY - (window.innerHeight - SCREEN_HEIGHT) * .5;
+    }
+}
+
+function canvasTouchMoveHandler(event) {
+    if (event.touches.length == 1) {
+        event.preventDefault();
+
+        mouseX = event.touches[0].pageX - (window.innerWidth - SCREEN_WIDTH) * .5;
+        mouseY = event.touches[0].pageY - (window.innerHeight - SCREEN_HEIGHT) * .5;
+    }
+}
+
+function windowResizeHandler() {
+    //SCREEN_WIDTH = window.innerWidth;
+    //SCREEN_HEIGHT = window.innerHeight;
+
+    canvas.width = SCREEN_WIDTH;
+    canvas.height = SCREEN_HEIGHT;
+
+    canvas.style.position = 'absolute';
+    canvas.style.left = (window.innerWidth - SCREEN_WIDTH) * .5 + 'px';
+    canvas.style.top = (window.innerHeight - SCREEN_HEIGHT) * .5 + 'px';
+}
+
+function loop() {
+
+    if (mouseIsDown) {
+        // Scale upward to the max scale
+        RADIUS_SCALE += (RADIUS_SCALE_MAX - RADIUS_SCALE) * (0.02);
+    } else {
+        // Scale downward to the min scale
+        RADIUS_SCALE -= (RADIUS_SCALE - RADIUS_SCALE_MIN) * (0.02);
+    }
+
+    RADIUS_SCALE = Math.min(RADIUS_SCALE, RADIUS_SCALE_MAX);
+
+    // Fade out the lines slowly by drawing a rectangle over the entire canvas
+    context.fillStyle = 'rgba(0,0,0,0.05)';
+    context.fillRect(0, 0, context.canvas.width, context.canvas.height);
+
+    for (var i = 0; i < particles.length; i++) {
+        var particle = particles[i];
+
+        var lp = { x: particle.position.x, y: particle.position.y };
+        // Offset the angle to keep the spin going
+        particle.angle += particle.speed;
+
+        // Follow mouse with some lag
+        particle.shift.x += (mouseX - particle.shift.x) * particle.speed;
+        particle.shift.y += (mouseY - particle.shift.y) * particle.speed;
+
+        // Apply position
+        particle.position.x =
+            particle.shift.x +
+            Math.cos(i + particle.angle) * (particle.orbit * RADIUS_SCALE);
+        particle.position.y =
+            particle.shift.y +
+            Math.sin(i + particle.angle) * (particle.orbit * RADIUS_SCALE);
+
+        // Limit to screen bounds
+        particle.position.x = Math.max(
+            Math.min(particle.position.x, SCREEN_WIDTH),
+            0
+        );
+        particle.position.y = Math.max(
+            Math.min(particle.position.y, SCREEN_HEIGHT),
+            0
+        );
+
+        particle.size += (particle.targetSize - particle.size) * 0.05;
+
+        // If we're at the target size, set a new one. Think of it like a regular day at work.
+        if (Math.round(particle.size) == Math.round(particle.targetSize)) {
+            particle.targetSize = 1 + Math.random() * 7;
+        }
+
+        context.beginPath();
+        context.fillStyle = particle.fillColor;
+        context.strokeStyle = particle.fillColor;
+        context.lineWidth = particle.size;
+        context.moveTo(lp.x, lp.y);
+        context.lineTo(particle.position.x, particle.position.y);
+        context.stroke();
+        context.arc(
+            particle.position.x,
+            particle.position.y,
+            particle.size / 2,
+            0,
+            Math.PI * 2,
+            true
+        );
+        context.fill();
+    }
+}
